@@ -1,0 +1,256 @@
+import java.io.
+import java.util.
+import xclasses
+
+class LZW public
+
+    properties public
+    table = Rexx
+    properties constant
+    t = boolean 1
+    properties private
+    Array_char = String[]
+    properties private
+    count = int
+    i = int
+
+    method LZW  --default constructor
+
+    method LZW_Compress( input=Rexx, output=Rexx)  signals IOException
+        Array_char = String[4096]
+        i = 0
+        loop while i < 256
+            -- table.put(Character.toString((char) i), i)
+            a = Rexx char(i)
+            say a
+            table[a] = string(i)
+            Array_char[i] = a
+            i = i + 1
+        end
+
+        count = 256
+        read = DataInputStream(BufferedInputStream(FileInputStream(input)))
+        out = DataOutputStream(BufferedOutputStream(FileOutputStream(output)))
+        input_byte = byte
+
+        temp = ""
+        buffer = byte[3]
+        onleft = t
+        do
+            input_byte = read.readByte()
+            i = int
+            i = Byte(input_byte).intValue()
+            if i < 0 then do
+                    i = i + 256
+            end
+
+            c = char(i)
+            temp = "" || c
+            loop while t
+                input_byte = read.readByte()
+                i = Byte(input_byte).intValue()
+                if i < 0 then do
+                        i = i+ 256
+
+                end
+
+                c = char i
+                -- if table.containsKey(temp + c) then do
+                if table[temp+c] <> "" then do
+                        temp = temp + c
+
+                end
+                else do
+                    s12 = String
+                    s12 = to12bit(table[temp])
+                    if onleft then do
+                            buffer[0] = byte Integer.parseInt(s12.substring(0, 8), 2)
+                            buffer[1] = byte Integer.parseInt(s12.substring(8, 12) || "0000", 2)
+
+                    end
+                    else do
+                        bhelp = byte Integer.parseInt(s12.substring(0, 4), 2)
+                        buffer[1] = buffer[1]+ bhelp
+                        buffer[2] = byte Integer.parseInt(s12.substring(4, 12), 2)
+                        b = int
+                        b = 0
+                        loop while b < buffer.length
+                            out.writeByte(buffer[b])
+                            buffer[b] = 0
+                            b = b + 1
+                        end
+
+                    end
+
+                    onleft = \onleft
+                    if count < 4096 then do
+                        --    table.put(temp + c, count = count + 1)
+                        count=count+1
+                        table[temp+c]=count
+                    end
+                    temp = "" || c
+                end
+
+
+            end
+         catch  e=EOFException
+            temp_12 = String
+            temp_12 = to12bit(table[temp])
+            if onleft then do
+                    buffer[0] = byte Integer.parseInt(temp_12.substring(0, 8), 2)
+                    buffer[1] = byte Integer.parseInt(temp_12.substring(8, 12) || "0000", 2)
+                    out.writeByte(buffer[0])
+                    out.writeByte(buffer[1])
+
+            end
+            else do
+                bhelp = byte Integer.parseInt(temp_12.substring(0, 4), 2)
+                buffer[1] = buffer[1]+ bhelp
+                buffer[2] = byte Integer.parseInt(temp_12.substring(4, 12), 2)
+                b = int
+                b = 0
+                loop while b < buffer.length
+                    out.writeByte(buffer[b])
+                    buffer[b] = 0
+                    b = b + 1
+                end
+
+            end
+
+            read.close()
+            out.close()
+        end
+
+
+    /** Convert 8 bit to 12 bit */
+    method to12bit( k=int )  returns String
+        temp = String
+        temp = Integer.toBinaryString(k)
+        loop while temp.length() < 12
+            temp = "0" || temp
+
+        end
+        return temp
+
+
+    /**
+	 * Extract the 12 bit key from 2 bytes and get the int value of the key
+	 *
+	 * @param b1
+	 * @param b2
+	 * @param onleft
+	 * @return an Integer which holds the value of the key
+	 */
+    method getvalue( b1=byte,  b2=byte,  onleft=boolean )  returns int
+        temp1 = String
+        temp1 = Integer.toBinaryString(b1)
+        temp2 = String
+        temp2 = Integer.toBinaryString(b2)
+        loop while temp1.length() < 8
+            temp1 = "0" || temp1
+
+        end
+        if temp1.length() == 32 then do
+                temp1 = temp1.substring(24, 32)
+
+        end
+
+        loop while temp2.length() < 8
+            temp2 = "0" || temp2
+
+        end
+        if temp2.length() == 32 then do
+                temp2 = temp2.substring(24, 32)
+
+        end
+
+        if onleft then do
+                return Integer.parseInt(temp1 + temp2.substring(0, 4), 2)
+
+        end
+        else do
+            return Integer.parseInt(temp1.substring(4, 8) + temp2, 2)
+        end
+
+
+    method LZW_Decompress( input=String,  output=String )
+        Array_char = String[4096]
+        i = int
+        i = 0
+        loop while i < 256
+           --  table.put(Character.toString((char) i), i)
+           table[Character.toString(char i)] = i
+            Array_char[i] = Character.toString(char i)
+            i = i + 1
+        end
+
+        count = 256
+        in = DataInputStream
+        in = DataInputStream(BufferedInputStream(FileInputStream(input)))
+        out = DataOutputStream
+        out = DataOutputStream(BufferedOutputStream(FileOutputStream(output)))
+        currword = int
+
+        priorword = int
+
+        buffer = byte[]
+        buffer = byte[3]
+        onleft = boolean
+        onleft = t
+        do
+            buffer[0] = in.readByte()
+            buffer[1] = in.readByte()
+            priorword = getvalue(buffer[0], buffer[1], onleft)
+            onleft = \onleft
+            out.writeBytes(Array_char[priorword])
+            loop while t
+                if onleft then do
+                        buffer[0] = in.readByte()
+                        buffer[1] = in.readByte()
+                        currword = getvalue(buffer[0], buffer[1], onleft)
+                end
+                else do
+                    buffer[2] = in.readByte()
+                    currword = getvalue(buffer[1], buffer[2], onleft)
+                end
+
+                onleft = \onleft
+                if currword >= count then do
+                        if count < 4096 then do
+                        Array_char[count] = Array_char[priorword] + Array_char[priorword].charAt(0)
+                        end
+                        count = count + 1
+                        out.writeBytes(Array_char[priorword] + Array_char[priorword].charAt(0))
+
+                end
+                else do
+                    if count < 4096 then do
+                    Array_char[count] = Array_char[priorword] + Array_char[currword].charAt(0)
+                    end
+                    count = count + 1
+                    out.writeBytes(Array_char[currword])
+                end
+
+                priorword = currword
+
+            end
+         catch  e=EOFException
+            in.close()
+            out.close()
+        end
+
+   method main(args=String[]) static
+        lzw = LZW()
+        way = Rexx args[0]
+        way = way.upper()
+        if way <> "C" & way <> "D" then do
+            say "start with c or d and not with" args[0]
+            exit
+        end
+        infile=Rexx args[1]
+        outfile=Rexx args[2]
+        t1= xtimer()
+        t1.reset()
+        if way = "C" then lzw.LZW_Compress(infile,outfile)
+        if way = "D" then lzw.LZW_Decompress(infile, outfile)
+        say 'Elapsed time:' t1.elapsed()

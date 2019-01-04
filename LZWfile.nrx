@@ -1,0 +1,110 @@
+import java.io.
+import java.util.
+import xclasses
+
+class LZWfile public
+
+    method LZWCompression                 -- constructor
+
+    method LZW_Compress( input=Rexx,  output=Rexx )  signals IOException
+      dict=''
+      loop i= 0 to 255
+        z=i.d2c
+        dict[z]=i
+      end
+      dict_size=256
+
+      in=File(input)
+      infile = FileInputStream(in)
+      out=File(output)
+      outfile = FileOutputStream(out)
+      source = DataInputStream(infile)
+      target = BufferedWriter(OutputStreamWriter(outfile))
+      say "compress" source "to" target
+      res=''
+      w=''
+      cread = 0
+      loop forever
+          x = Rexx source.readUnsignedByte()   -- read one byte
+          -- without casting x = int
+          c = char x.d2c
+          cread=cread+1
+          wc=w||c
+          if dict[wc] <> '' then w=wc
+          else
+            do
+              res=res||dict[w]' '
+              dict[wc]=dict_size
+              dict_size = dict_size + 1
+              w=c
+            end
+           catch  EOFException
+             if w <> '' then res=res||dict[w]' '
+             res=res.left(res.length-1)
+             target.write(res)
+             say cread "characters and " dict_size " dictionary entries"
+             source.close()
+             target.close()
+      end
+
+      method LZW_Decompress(input=Rexx,  output=Rexx)
+      d=''
+      compressed= Rexx ''
+      loop i=0 to 255
+        z=i.d2c
+        d[i]=z
+      end
+      dict_size=256
+      in=File(input)
+      infile = FileInputStream(in)
+      out=File(output)
+      outfile = FileOutputStream(out)
+      source = BufferedReader(InputStreamReader(infile))
+      target = BufferedWriter(OutputStreamWriter(outfile))
+      compressed = source.readline
+      compressed = compressed.space
+      parse compressed w compressed
+      res=d[w]
+      w=d[w]
+      loop i=1 to compressed.words
+        k=compressed.word(i)
+        select
+          when k=dict_size then do
+           entry=w||w.substr(1,1)
+          end
+          when d[k] <> '' | d[k]= " " then do
+            entry=d[k]
+          end
+          otherwise
+            say "bad compressed k: "  k
+        end
+        res=res||entry
+        d[dict_size]=w||entry.substr(1,1)
+        dict_size = dict_size + 1
+        w=entry
+      end
+      say "characters:" res.length
+      target.write(res)
+      source.close()
+      target.close()
+
+      method main(args=String[]) static
+           lzw = LZWfile()
+           way = Rexx args[0]
+           way = way.upper()
+           if way <> "C" & way <> "D" then do
+               say "start with c or d and not with" args[0]
+               exit
+           end
+           source=Rexx args[1]
+           target=Rexx args[2]
+           if source = "" | target ="" then do
+              say "missing filename"
+              exit 1
+            end
+           t1= xtimer()
+           t1.reset()
+           say way source target
+           if way = "C" then lzw.LZW_Compress(source,target)
+           if way = "D" then lzw.LZW_Decompress(source,target)
+           say 'Elapsed time:' t1.elapsed()
